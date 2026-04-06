@@ -31,6 +31,8 @@ API_ID=123456
 API_HASH=seu_api_hash
 BOT_USERNAME=nome_do_bot_sem_@
 SESSION_NAME=user
+TELEGRAM_SESSION_STRING=
+ALLOW_INTERACTIVE_LOGIN=false
 RESPONSE_TIMEOUT=10
 ```
 
@@ -47,6 +49,18 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 Na primeira execução, o Telethon pode pedir autenticação (telefone/código) no terminal. Isso cria um arquivo `.session` (já ignorado no git).
+
+Para deploy no Render (sem terminal interativo), use `TELEGRAM_SESSION_STRING` no lugar do login por prompt.
+Se essa variável não for definida e a sessão não estiver autorizada, a aplicação falhará no startup.
+
+Você pode gerar essa string localmente com:
+
+```powershell
+cd backend
+python generate_string_session.py
+```
+
+Depois copie o valor exibido para a variável `TELEGRAM_SESSION_STRING` no painel do Render.
 
 ## Rodando o frontend
 

@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from telethon import TelegramClient, events
+from telethon.sessions import StringSession
 from dotenv import load_dotenv
 
 
@@ -27,6 +28,8 @@ API_ID_RAW = os.getenv("API_ID")
 API_HASH = os.getenv("API_HASH")
 BOT_USERNAME = os.getenv("BOT_USERNAME", "")
 SESSION_NAME = os.getenv("SESSION_NAME", "telegram_user")
+TELEGRAM_SESSION_STRING = os.getenv("TELEGRAM_SESSION_STRING", "").strip()
+ALLOW_INTERACTIVE_LOGIN = os.getenv("ALLOW_INTERACTIVE_LOGIN", "false").lower() == "true"
 RESPONSE_TIMEOUT = float(os.getenv("RESPONSE_TIMEOUT", "10"))
 FOLLOWUP_IDLE_TIMEOUT = float(os.getenv("FOLLOWUP_IDLE_TIMEOUT", "1.5"))
 FILE_WAIT_HINTS = (
@@ -57,8 +60,21 @@ download_cache: dict[str, dict] = {}
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     global telegram_client
-    telegram_client = TelegramClient(SESSION_NAME, API_ID, API_HASH)
-    await telegram_client.start()
+    session = StringSession(TELEGRAM_SESSION_STRING) if TELEGRAM_SESSION_STRING else SESSION_NAME
+    telegram_client = TelegramClient(session, API_ID, API_HASH)
+
+    if ALLOW_INTERACTIVE_LOGIN:
+        await telegram_client.start()
+    else:
+        await telegram_client.connect()
+        is_authorized = await telegram_client.is_user_authorized()
+        if not is_authorized:
+            raise RuntimeError(
+                "Telegram session is not authorized. "
+                "Set TELEGRAM_SESSION_STRING (recommended for Render) "
+                "or enable ALLOW_INTERACTIVE_LOGIN=true for local interactive login."
+            )
+
     await telegram_client.get_entity(BOT_USERNAME)
 
     try:
