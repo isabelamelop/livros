@@ -1,0 +1,19 @@
+backend/.venv/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Secrets / local config
+backend/.env
+backend/.env.*
+!backend/.env.example
+
+# Telegram local auth/session files
+backend/*.session
+backend/*.session-journal
+
+# Common local artifacts
+*.log
+.pytest_cache/
+.mypy_cache/
