@@ -15,211 +15,358 @@ from telethon.sessions import StringSession
 from dotenv import load_dotenv
 
 
+# -------------------------
+# REQUESTS
+# -------------------------
 class SearchRequest(BaseModel):
     query: str
 
 
+class SelectRequest(BaseModel):
+    command: str
+
+
+# -------------------------
+# ENV
+# -------------------------
 BACKEND_DIR = Path(__file__).resolve().parent
 load_dotenv(BACKEND_DIR / ".env")
-load_dotenv(BACKEND_DIR.parent / ".env")
 
-
-API_ID_RAW = os.getenv("API_ID")
+API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
-BOT_USERNAME = os.getenv("BOT_USERNAME", "")
-SESSION_NAME = os.getenv("SESSION_NAME", "telegram_user")
-TELEGRAM_SESSION_STRING = os.getenv("TELEGRAM_SESSION_STRING", "").strip()
-ALLOW_INTERACTIVE_LOGIN = os.getenv("ALLOW_INTERACTIVE_LOGIN", "false").lower() == "true"
-RESPONSE_TIMEOUT = float(os.getenv("RESPONSE_TIMEOUT", "10"))
-FOLLOWUP_IDLE_TIMEOUT = float(os.getenv("FOLLOWUP_IDLE_TIMEOUT", "1.5"))
-FILE_WAIT_HINTS = (
-    "sending you a file",
-    "please wait",
-    "aguarde",
-    "enviando",
-    "arquivo",
-)
+BOT_USERNAME = os.getenv("BOT_USERNAME")
 
-if not API_ID_RAW:
-    raise RuntimeError("Missing API_ID environment variable")
-if not API_HASH:
-    raise RuntimeError("Missing API_HASH environment variable")
-if not BOT_USERNAME:
-    raise RuntimeError("Missing BOT_USERNAME environment variable")
+SESSION = os.getenv("TELEGRAM_SESSION_STRING", "")
 
-try:
-    API_ID = int(API_ID_RAW)
-except ValueError as error:
-    raise RuntimeError("API_ID must be an integer") from error
-
-telegram_client: Optional[TelegramClient] = None
-telegram_lock = asyncio.Lock()
-download_cache: dict[str, dict] = {}
+RESPONSE_TIMEOUT = 12
+FOLLOWUP_IDLE_TIMEOUT = 1.5
 
 
+# -------------------------
+# STATE
+# -------------------------
+client: Optional[TelegramClient] = None
+lock = asyncio.Lock()
+download_cache = {}
+
+
+def normalize_download_filename(filename: str) -> str:
+    clean_name = Path(filename or "").name.strip()
+    if not clean_name:
+        return "livro.epub"
+
+    suffix = Path(clean_name).suffix
+    stem = Path(clean_name).stem
+
+    stem = stem.replace("_", " ")
+    stem = re.sub(
+        r"\b(?:z[\s-]*library|z[\s-]*lib|1lib|sk|lib\s*sk)\b",
+        "",
+        stem,
+        flags=re.IGNORECASE,
+    )
+    stem = re.sub(r"\s*,\s*", " ", stem)
+    stem = re.sub(r"\s+", " ", stem).strip(" -_,.;")
+
+    if not stem:
+        stem = "livro"
+
+    if not suffix:
+        suffix = ".epub"
+
+    return f"{stem}{suffix}"
+
+
+# -------------------------
+# PARSER CORRIGIDO (🔥 CORAÇÃO DO FIX)
+# -------------------------
+def parse_books(text: str):
+    """Extrai opções de livro ignorando emojis decorativos e linhas de resumo."""
+
+    normalized = text.replace("\r\n", "\n")
+    normalized = re.sub(
+        r"(?im)^\s*📚\s*(good\s+news!\s*we\s+found.*)$",
+        r"\1",
+        normalized,
+    )
+    lines = [line.strip() for line in normalized.split("\n") if line.strip()]
+    books = []
+
+    def clean_title(value: str) -> str:
+        cleaned = value
+        if cleaned.startswith("📚"):
+            cleaned = cleaned[1:].strip()
+        cleaned = cleaned.replace("↗️", "").strip()
+        return cleaned.strip(" -–:()")
+
+    def is_summary_line(value: str) -> bool:
+        lower = value.lower()
+        return (
+            "good news" in lower
+            or "we found" in lower
+            or "on your request" in lower
+            or "sugest" in lower
+        )
+
+    def is_metadata(value: str) -> bool:
+        lower = value.lower()
+        return (
+            value.startswith("🌐")
+            or value.startswith("/")
+            or value == "↗️"
+            or bool(re.search(r"\b(epub|pdf|mobi|azw3|fb2)\b", lower))
+            or bool(re.search(r"\d+(?:[\.,]\d+)?\s*(kb|mb|gb)\b", lower))
+            or is_summary_line(value)
+        )
+
+    def extract_format(value: str) -> str:
+        compact = re.sub(r"[^a-z]", "", value.lower())
+        if "epub" in compact:
+            return "EPUB"
+        if "pdf" in compact:
+            return "PDF"
+        if "mobi" in compact:
+            return "MOBI"
+        if "azw3" in compact:
+            return "AZW3"
+        if "fb2" in compact:
+            return "FB2"
+        return ""
+
+    for i, line in enumerate(lines):
+        command_match = re.search(r"(/book_[^\s\n\r]+)", line)
+        if not command_match:
+            continue
+
+        command = command_match.group(1)
+        command_suffix = line[command_match.end():]
+
+        title = ""
+        title_line_index = None
+        for j in range(i - 1, max(-1, i - 8), -1):
+            candidate = lines[j]
+            if candidate.startswith("📚"):
+                candidate_title = clean_title(candidate)
+                if candidate_title and not is_summary_line(candidate_title):
+                    title = candidate_title
+                    title_line_index = j
+                    break
+
+        if not title:
+            title = f"Livro {len(books) + 1}"
+
+        segment_start = title_line_index + 1 if title_line_index is not None else max(0, i - 6)
+        segment_lines = lines[segment_start:i]
+        context_lines = segment_lines + [line] + lines[i + 1:min(len(lines), i + 3)]
+
+        author = ""
+        language = "—"
+        fmt = extract_format(command_suffix)
+        size_match_on_command = re.search(
+            r"\d+(?:[\.,]\d+)?\s*(KB|MB|GB)\b",
+            command_suffix,
+            re.IGNORECASE,
+        )
+        size = size_match_on_command.group(0).upper() if size_match_on_command else ""
+
+        for segment_line in context_lines:
+            language_match = re.search(r"🌐\s*(.+)$", segment_line)
+            if language_match and language_match.group(1).strip():
+                language = language_match.group(1).strip()
+
+            if not fmt:
+                fmt = extract_format(segment_line)
+
+            size_match = re.search(r"\d+(?:[\.,]\d+)?\s*(KB|MB|GB)\b", segment_line, re.IGNORECASE)
+            if size_match and not size:
+                size = size_match.group(0).upper()
+
+            cleaned_segment = clean_title(segment_line)
+            if (
+                not author
+                and segment_line in segment_lines
+                and cleaned_segment
+                and not is_metadata(segment_line)
+                and cleaned_segment != title
+            ):
+                author = cleaned_segment
+
+        book_info = {
+            "command": command,
+            "title": title,
+            "author": author or "Autor desconhecido",
+            "language": language,
+            "format": fmt,
+            "size": size,
+        }
+
+        books.append(book_info)
+        print(f"✅ PARSER: '{command}' → '{book_info['title']}' por '{book_info['author']}'")
+
+    print(f"📚 Total: {len(books)} livros parseados")
+    return books
+
+
+# -------------------------
+# APP
+# -------------------------
 @asynccontextmanager
-async def lifespan(_: FastAPI):
-    global telegram_client
-    session = StringSession(TELEGRAM_SESSION_STRING) if TELEGRAM_SESSION_STRING else SESSION_NAME
-    telegram_client = TelegramClient(session, API_ID, API_HASH)
-
-    if ALLOW_INTERACTIVE_LOGIN:
-        await telegram_client.start()
-    else:
-        await telegram_client.connect()
-        is_authorized = await telegram_client.is_user_authorized()
-        if not is_authorized:
-            raise RuntimeError(
-                "Telegram session is not authorized. "
-                "Set TELEGRAM_SESSION_STRING (recommended for Render) "
-                "or enable ALLOW_INTERACTIVE_LOGIN=true for local interactive login."
-            )
-
-    await telegram_client.get_entity(BOT_USERNAME)
-
-    try:
-        yield
-    finally:
-        if telegram_client is not None and telegram_client.is_connected():
-            await telegram_client.disconnect()
+async def lifespan(app: FastAPI):
+    global client
+    client = TelegramClient(StringSession(SESSION), API_ID, API_HASH)
+    await client.connect()
+    if not await client.is_user_authorized():
+        raise RuntimeError("Telegram not authorized")
+    await client.get_entity(BOT_USERNAME)
+    yield
+    if client:
+        await client.disconnect()
 
 
-app = FastAPI(title="Telegram Search API", lifespan=lifespan)
-
+app = FastAPI(title="Books API", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
+# -------------------------
+# SEARCH
+# -------------------------
 @app.post("/search")
-async def search_book(payload: SearchRequest):
-    if telegram_client is None or not telegram_client.is_connected():
-        raise HTTPException(status_code=503, detail="Telegram client is not connected")
-
-    query = payload.query.strip()
-    if not query:
-        raise HTTPException(status_code=400, detail="Field 'query' cannot be empty")
+async def search(payload: SearchRequest):
+    if not payload.query.strip():
+        raise HTTPException(400, "query required")
 
     loop = asyncio.get_running_loop()
-    sent_message_id: Optional[int] = None
-    incoming_messages: asyncio.Queue = asyncio.Queue()
+    queue = asyncio.Queue()
+    sent_id = None
 
-    async def on_new_message(event):
-        nonlocal sent_message_id
-
-        if event.out:
+    async def handler(event):
+        nonlocal sent_id
+        if event.out or sent_id is None or event.message.id <= sent_id:
             return
+        queue.put_nowait(event.message)
 
-        if sent_message_id is None:
-            return
+    event = events.NewMessage(chats=BOT_USERNAME, incoming=True)
 
-        if event.message.id > sent_message_id:
-            incoming_messages.put_nowait(event.message)
-
-    event_builder = events.NewMessage(chats=BOT_USERNAME, incoming=True)
-
-    async with telegram_lock:
-        telegram_client.add_event_handler(on_new_message, event_builder)
+    async with lock:
+        client.add_event_handler(handler, event)
         try:
-            sent_message = await telegram_client.send_message(BOT_USERNAME, query)
-            sent_message_id = sent_message.id
+            sent = await client.send_message(BOT_USERNAME, payload.query)
+            sent_id = sent.id
 
             deadline = loop.time() + RESPONSE_TIMEOUT
-            received_any = False
-            waiting_for_document = False
-            response_chunks: list[str] = []
-            download_payload = None
+            full_text = ""
 
             while True:
                 remaining = deadline - loop.time()
                 if remaining <= 0:
                     break
-
-                wait_timeout = min(remaining, FOLLOWUP_IDLE_TIMEOUT if received_any else remaining)
-
                 try:
-                    message = await asyncio.wait_for(incoming_messages.get(), timeout=wait_timeout)
+                    msg = await asyncio.wait_for(queue.get(), timeout=min(remaining, FOLLOWUP_IDLE_TIMEOUT))
+                    text = msg.raw_text or ""
+                    if text:
+                        full_text += "\n" + text
                 except asyncio.TimeoutError:
-                    if received_any:
-                        if waiting_for_document:
-                            continue
-                        break
-                    raise HTTPException(
-                        status_code=504,
-                        detail=f"No reply from bot within {RESPONSE_TIMEOUT:.0f} seconds",
-                    )
-
-                received_any = True
-
-                message_text = (message.raw_text or "").strip()
-                if message_text:
-                    response_chunks.append(message_text)
-                    normalized_text = message_text.lower()
-                    if any(hint in normalized_text for hint in FILE_WAIT_HINTS):
-                        waiting_for_document = True
-
-                if message.document is not None:
-                    file_bytes = await telegram_client.download_media(message, file=bytes)
-                    if file_bytes is not None:
-                        filename = None
-                        if message.file is not None:
-                            filename = message.file.name
-
-                        if not filename:
-                            filename = f"telegram_document_{message.id}"
-
-                        mime_type = "application/octet-stream"
-                        if message.file is not None and message.file.mime_type:
-                            mime_type = message.file.mime_type
-
-                        token = uuid.uuid4().hex
-                        download_cache[token] = {
-                            "filename": filename,
-                            "mime_type": mime_type,
-                            "content": file_bytes,
-                        }
-                        download_payload = {
-                            "filename": filename,
-                            "mime_type": mime_type,
-                            "download_url": f"/download/{token}",
-                        }
-                        waiting_for_document = False
                     break
-                elif waiting_for_document:
-                    continue
+
+            books = parse_books(full_text)
+            return {"options": books}
+
         finally:
-            telegram_client.remove_event_handler(on_new_message, event_builder)
+            client.remove_event_handler(handler, event)
 
-    combined_response = "\n\n".join(response_chunks).strip()
-    options = sorted(set(re.findall(r"/book_[A-Za-z0-9]+", combined_response)))
 
-    return {
-        "query": query,
-        "response": combined_response,
-        "options": options,
-        "document": download_payload,
-    }
+# -------------------------
+# SELECT
+# -------------------------
+@app.post("/select")
+async def select(payload: SelectRequest):
+    if not payload.command:
+        raise HTTPException(400, "command required")
+
+    loop = asyncio.get_running_loop()
+    queue = asyncio.Queue()
+    sent_id = None
+
+    async def handler(event):
+        nonlocal sent_id
+        if event.out or sent_id is None or event.message.id <= sent_id:
+            return
+        queue.put_nowait(event.message)
+
+    event = events.NewMessage(chats=BOT_USERNAME, incoming=True)
+
+    async with lock:
+        client.add_event_handler(handler, event)
+        try:
+            sent = await client.send_message(BOT_USERNAME, payload.command)
+            sent_id = sent.id
+
+            deadline = loop.time() + RESPONSE_TIMEOUT
+
+            while True:
+                remaining = deadline - loop.time()
+                if remaining <= 0:
+                    break
+                try:
+                    msg = await asyncio.wait_for(queue.get(), timeout=remaining)
+                except asyncio.TimeoutError:
+                    break
+
+                if msg.document:
+                    file_bytes = await client.download_media(msg, file=bytes)
+                    token = uuid.uuid4().hex
+                    normalized_filename = normalize_download_filename(
+                        msg.file.name or f"livro_{payload.command}"
+                    )
+                    download_cache[token] = {
+                        "filename": normalized_filename,
+                        "mime_type": msg.file.mime_type or "application/octet-stream",
+                        "content": file_bytes,
+                    }
+                    print(f"📦 Download: {download_cache[token]['filename']}")
+                    return {
+                        "document": {
+                            "download_url": f"/download/{token}",
+                            "filename": download_cache[token]["filename"]
+                        }
+                    }
+
+                text = msg.raw_text or ""
+                match = re.search(r'https?://[^\s<>"]+', text)
+                if match:
+                    return {
+                        "document": {
+                            "download_url": match.group(0),
+                            "filename": "livro_direct_link"
+                        }
+                    }
+
+        finally:
+            client.remove_event_handler(handler, event)
+
+    raise HTTPException(404, "No document found")
+
+
+# -------------------------
+# DOWNLOAD & HEALTH
+# -------------------------
+@app.get("/download/{token}")
+async def download(token: str):
+    file = download_cache.pop(token, None)
+    if not file:
+        raise HTTPException(404, "File expired")
+    return StreamingResponse(
+        iter([file["content"]]),
+        media_type=file["mime_type"],
+        headers={"Content-Disposition": f'attachment; filename="{file["filename"]}"'}
+    )
 
 
 @app.get("/health")
-async def health_check():
+async def health():
     return {"status": "ok"}
-
-
-@app.get("/download/{token}")
-async def download_document(token: str):
-    file_entry = download_cache.get(token)
-    if file_entry is None:
-        raise HTTPException(status_code=404, detail="File not found or expired")
-
-    return StreamingResponse(
-        iter([file_entry["content"]]),
-        media_type=file_entry["mime_type"],
-        headers={
-            "Content-Disposition": f"attachment; filename=\"{file_entry['filename']}\""
-        },
-    )
