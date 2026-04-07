@@ -1,238 +1,372 @@
 <!doctype html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Busca de Livros via Telegram</title>
-  <style>
-    :root {
-      --bg: #0b1020;
-      --card: #131c34;
-      --card-2: #0f172a;
-      --text: #e2e8f0;
-      --muted: #94a3b8;
-      --primary: #4f46e5;
-      --primary-hover: #4338ca;
-      --border: #27324d;
-      --ok: #10b981;
-      --error: #f87171;
-    }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-
-    body {
-      font-family: Inter, Segoe UI, Roboto, Arial, sans-serif;
-      background: radial-gradient(circle at top, #172554, var(--bg));
-      color: var(--text);
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 24px;
-    }
-
-    .app {
-      width: min(820px, 100%);
-      background: rgba(15, 23, 42, 0.9);
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      box-shadow: 0 24px 48px rgba(0, 0, 0, 0.35);
-      padding: 22px;
-    }
-
-    h1 {
-      font-size: 1.3rem;
-      margin-bottom: 8px;
-    }
-
-    .subtitle {
-      color: var(--muted);
-      margin-bottom: 18px;
-      font-size: 0.94rem;
-    }
-
-    .row {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 12px;
-    }
-
-    input {
-      flex: 1;
-      background: var(--card);
-      color: var(--text);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      font-size: 16px;
-      padding: 11px 12px;
-      outline: none;
-    }
-
-    input:focus {
-      border-color: var(--primary);
-      box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.25);
-    }
-
-    button {
-      background: var(--primary);
-      color: white;
-      border: none;
-      border-radius: 10px;
-      font-size: 15px;
-      font-weight: 600;
-      padding: 11px 14px;
-      cursor: pointer;
-      min-width: 100px;
-    }
-
-    button:hover:not(:disabled) { background: var(--primary-hover); }
-    button:disabled { opacity: .7; cursor: not-allowed; }
-
-    .box {
-      background: var(--card-2);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 14px;
-      margin-top: 10px;
-    }
-
-    .label {
-      color: var(--muted);
-      font-size: .85rem;
-      margin-bottom: 6px;
-    }
-
-    pre {
-      white-space: pre-wrap;
-      word-break: break-word;
-      font-family: inherit;
-      line-height: 1.5;
-      min-height: 54px;
-    }
-
-    #options { color: #cbd5e1; }
-    #download a {
-      color: #93c5fd;
-      text-decoration: none;
-      font-weight: 600;
-    }
-    #download a:hover { text-decoration: underline; }
-
-    .status {
-      margin-top: 12px;
-      color: var(--ok);
-      font-size: .88rem;
-    }
-
-    .status.error { color: var(--error); }
-
-    @media (max-width: 680px) {
-      .row { flex-direction: column; }
-      button { width: 100%; }
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Livros da Rafa</title>
+<style>
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: linear-gradient(135deg, #0b1020 0%, #1a1b2f 50%, #0f172a 100%);
+  color: #e2e8f0;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 32px 20px;
+  line-height: 1.6;
+}
+.app { width: 100%; max-width: 800px; }
+.card {
+  background: #131c34;
+  border: 1px solid #2f3b5d;
+  border-radius: 20px;
+  padding: 28px;
+  margin-bottom: 24px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+  transition: all 0.3s ease;
+}
+.card:hover {
+  transform: translateY(-4px);
+  border-color: #ff63b3;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+}
+.card h2 {
+  margin: 0 0 16px 0;
+  font-size: 32px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #ffd1ea 0%, #ff7fc4 50%, #ff4da6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.card h3 {
+  margin: 0 0 20px 0;
+  font-size: 22px;
+  font-weight: 600;
+  color: #f8fafc;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.row { display: flex; gap: 16px; align-items: stretch; }
+input {
+  flex: 1;
+  padding: 20px 24px;
+  border-radius: 16px;
+  border: 2px solid #334155;
+  background: #0f172a;
+  color: #f1f5f9;
+  font-size: 16px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+input:focus {
+  outline: none;
+  border-color: #ff6ab8;
+  box-shadow: 0 0 0 4px rgba(255,106,184,0.2);
+}
+input::placeholder { color: #94a3b8; }
+button {
+  padding: 20px 28px;
+  border: none;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #ff63b3, #d6368f);
+  color: white;
+  font-weight: 600;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 8px 25px rgba(214,54,143,0.35);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 35px rgba(214,54,143,0.45);
+}
+button:disabled { opacity: 0.6; cursor: not-allowed; }
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-radius: 50%;
+  border-top-color: #fff;
+  animation: spin 1s ease-in-out infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.options-container { display: flex; flex-direction: column; gap: 16px; }
+.option {
+  padding: 24px;
+  border-radius: 16px;
+  border: 2px solid #334155;
+  background: #0f172a;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+.option:nth-child(1) { border-color: #475569; }
+.option:nth-child(2) { border-color: #475569; }
+.option:nth-child(3) { border-color: #475569; }
+.option:nth-child(4) { border-color: #475569; }
+.option:nth-child(5) ~ .option { border-color: #475569; }
+.option:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 15px 40px rgba(214,54,143,0.25);
+  border-color: #ff63b3 !important;
+}
+.option b {
+  font-size: 18px;
+  color: #f8fafc;
+  display: block;
+  margin-bottom: 12px;
+}
+.small {
+  font-size: 15px;
+  color: #cbd5e1;
+  line-height: 1.6;
+}
+.download-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 28px;
+  background: linear-gradient(135deg, #ff63b3, #d6368f);
+  color: white;
+  text-decoration: none;
+  border-radius: 14px;
+  font-weight: 600;
+  font-size: 16px;
+  transition: all 0.3s ease;
+  box-shadow: 0 8px 25px rgba(214,54,143,0.35);
+  margin-top: 16px;
+}
+.download-link:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 35px rgba(214,54,143,0.45);
+}
+.empty-state {
+  text-align: center;
+  padding: 32px 24px;
+  color: #94a3b8;
+}
+@media (max-width: 768px) {
+  body { padding: 24px 16px; }
+  .card { padding: 24px 20px; }
+  .row { flex-direction: column; }
+  button { width: 100%; }
+}
+</style>
 </head>
 <body>
-  <main class="app">
-    <h1>Buscar livro no bot do Telegram</h1>
-    <p class="subtitle">Frontend no Netlify + backend no Render</p>
-
-    <div class="row">
-      <input id="queryInput" type="text" placeholder="Digite o nome do livro" />
-      <button id="searchBtn">Buscar</button>
+<div class="app">
+  <div class="card">
+    <h2>Biblioteca da Rafa</h2>
+    <div class="small">
+      Boa leitura, Rafa 🩷<br>
+      Feito pra você encontrar seu próximo livro sem esforço!
     </div>
-
-    <div class="box">
-      <p class="label">Resposta</p>
-      <pre id="result">Aguardando pesquisa...</pre>
+    <div class="row" style="margin-top: 20px;">
+      <input id="input" placeholder="O que você quer ler hoje, Rafa?"/>
+      <button id="btn">
+        <span id="btn-text">🔍 Buscar</span>
+        <span id="btn-spinner" class="spinner" style="display:none;"></span>
+      </button>
     </div>
-
-    <div class="box">
-      <p class="label">Opções</p>
-      <p id="options">—</p>
+    <div id="status" class="small" style="margin-top: 12px;">
+      Todas opções do universo pra você 🌺
     </div>
+  </div>
 
-    <div class="box">
-      <p class="label">Download</p>
-      <p id="download">—</p>
+  <div class="card">
+    <h3>✨ Sugestões pra você</h3>
+    <div id="options" class="options-container">—</div>
+  </div>
+
+  <div class="card">
+    <h3>⬇️ Seu livro</h3>
+    <div id="download" class="small">Clique numa opção acima!</div>
+  </div>
+</div>
+
+<script>
+const API = "https://livros-hfxv.onrender.com";
+
+async function callSearch(query) {
+  const res = await fetch(`${API}/search`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query })
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data?.detail || "Erro ao consultar API");
+  }
+  return data;
+}
+
+async function callSelect(command) {
+  const res = await fetch(`${API}/select`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ command })
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data?.detail || "Erro ao selecionar livro");
+  }
+  return data;
+}
+
+function cleanOptionTitle(rawTitle) {
+  const title = String(rawTitle || "").trim();
+  const cleaned = title
+    .replace(/^📚\s*on your request:?\s*/i, "")
+    .replace(/\bon your request:?\s*/i, "")
+    .trim();
+
+  return cleaned || "Livro";
+}
+
+function normalizeBookOption(option, index) {
+  if (typeof option === "string") {
+    const command = option.trim();
+    return {
+      command,
+      title: `Livro ${index + 1}`,
+      author: "Autor desconhecido",
+      language: "—",
+      format: "",
+      size: ""
+    };
+  }
+
+  return {
+    command: option?.command || "",
+    title: option?.title || `Livro ${index + 1}`,
+    author: option?.author || "Autor desconhecido",
+    language: option?.language || "—",
+    format: option?.format || "",
+    size: option?.size || ""
+  };
+}
+
+function normalizeDownloadFilename(rawFilename) {
+  const original = String(rawFilename || "arquivo.epub").trim();
+  const dotIndex = original.lastIndexOf(".");
+  const hasExt = dotIndex > 0;
+  const ext = hasExt ? original.slice(dotIndex) : ".epub";
+  const base = hasExt ? original.slice(0, dotIndex) : original;
+
+  const cleaned = base
+    .replace(/_/g, " ")
+    .replace(/\b(?:z\s*-?\s*library|z\s*-?\s*lib|1lib|lib\s*sk|sk)\b/gi, "")
+    .replace(/\s*,\s*/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return `${cleaned || "livro"}${ext}`;
+}
+
+function renderOptions(options) {
+  const container = document.getElementById("options");
+  if (!Array.isArray(options) || !options.length) {
+    container.innerHTML = '<div class="empty-state">Nada encontrado agora, Rafa 😕<br><small>Tenta outra busca?</small></div>';
+    return;
+  }
+
+  const normalizedOptions = options.map((option, index) => normalizeBookOption(option, index));
+
+  container.innerHTML = normalizedOptions.map((book) => `
+    <div class="option" data-command="${book.command || ""}">
+      <b>📚 ${cleanOptionTitle(book.title)}</b>
+      <div class="small">
+        <strong>${book.author || "Autor desconhecido"}</strong><br>
+        🌐 ${book.language || "—"}<br>
+        ${(book.format || "Formato não informado")} ${(book.size || "")}<br>
+        <small>${book.command || ""}</small>
+      </div>
     </div>
+  `).join("");
+}
 
-    <p id="status" class="status">API: https://livros-hfxv.onrender.com</p>
-  </main>
+function renderDownload(documentPayload) {
+  const downloadEl = document.getElementById("download");
+  if (!documentPayload?.download_url) {
+    downloadEl.textContent = "Ainda não recebi arquivo 😕";
+    return;
+  }
 
-  <script>
-    const API_BASE_URL = 'https://livros-hfxv.onrender.com';
+  const url = documentPayload.download_url.startsWith("http")
+    ? documentPayload.download_url
+    : API + documentPayload.download_url;
+  const prettyFilename = normalizeDownloadFilename(documentPayload.filename);
 
-    async function searchBook() {
-      const input = document.getElementById('queryInput');
-      const result = document.getElementById('result');
-      const options = document.getElementById('options');
-      const download = document.getElementById('download');
-      const status = document.getElementById('status');
-      const button = document.getElementById('searchBtn');
-      const query = input.value.trim();
+  downloadEl.innerHTML = `
+    📖 Aqui está seu livro!<br>
+    <a class="download-link" href="${url}" download="${prettyFilename}" target="_blank" rel="noopener noreferrer">
+      ⬇️ Baixar ${prettyFilename}
+    </a>
+  `;
+}
 
-      if (!query) {
-        result.textContent = 'Digite um nome de livro.';
-        options.textContent = '—';
-        download.textContent = '—';
-        status.classList.add('error');
-        status.textContent = 'Digite algo para pesquisar.';
-        return;
-      }
+document.getElementById("btn").onclick = async () => {
+  const input = document.getElementById("input");
+  const query = input.value.trim();
+  if (!query) return;
 
-      button.disabled = true;
-      result.textContent = 'Consultando bot...';
-      options.textContent = '—';
-      download.textContent = '—';
-      status.classList.remove('error');
-      status.textContent = 'Consultando backend...';
+  const btn = document.getElementById("btn");
+  const btnText = document.getElementById("btn-text");
+  const spinner = document.getElementById("btn-spinner");
+  const status = document.getElementById("status");
 
-      try {
-        const response = await fetch(`${API_BASE_URL}/search`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query })
-        });
+  btn.disabled = true;
+  btnText.style.display = "none";
+  spinner.style.display = "inline-block";
+  status.textContent = "Procurando seu livro... ✨";
 
-        const data = await response.json();
+  try {
+    const data = await callSearch(query);
+    renderOptions(data.options || []);
+    document.getElementById("download").textContent = "Clique numa opção acima!";
+    status.textContent = "Escolhe com calma 🩷";
+  } catch (error) {
+    status.textContent = `Erro na busca 😕 ${error.message || ""}`;
+  } finally {
+    btn.disabled = false;
+    btnText.style.display = "inline";
+    spinner.style.display = "none";
+  }
+};
 
-        if (!response.ok) {
-          result.textContent = `Erro: ${data.detail || 'Falha na requisição.'}`;
-          status.classList.add('error');
-          status.textContent = 'Backend respondeu com erro.';
-          return;
-        }
+document.getElementById("input").onkeypress = (e) => {
+  if (e.key === "Enter") document.getElementById("btn").click();
+};
 
-        result.textContent = data.response || '(sem texto na resposta)';
+document.getElementById("options").onclick = async (e) => {
+  const el = e.target.closest(".option");
+  if (!el) return;
 
-        if (Array.isArray(data.options) && data.options.length > 0) {
-          options.textContent = data.options.join(' | ');
-        }
+  const command = el.dataset.command;
+  if (!command) return;
 
-        if (data.document && data.document.download_url) {
-          const url = `${API_BASE_URL}${data.document.download_url}`;
-          const filename = data.document.filename || 'arquivo';
-          download.innerHTML = `📥 <a href="${url}" target="_blank" rel="noopener">Baixar ${filename}</a>`;
-        }
+  const status = document.getElementById("status");
+  status.textContent = "Buscando seu livro... 💙";
 
-        status.classList.remove('error');
-        status.textContent = 'Consulta concluída com sucesso.';
-      } catch (error) {
-        result.textContent = `Erro de conexão: ${error.message}`;
-        status.classList.add('error');
-        status.textContent = 'Falha ao conectar no Render.';
-      } finally {
-        button.disabled = false;
-      }
-    }
-
-    document.getElementById('searchBtn').addEventListener('click', searchBook);
-    document.getElementById('queryInput').addEventListener('keydown', (event) => {
-      if (event.key === 'Enter') {
-        searchBook();
-      }
-    });
-  </script>
+  try {
+    const data = await callSelect(command);
+    renderDownload(data.document);
+    status.textContent = data.document?.download_url
+      ? "Livro pronto para download ✅"
+      : "Ainda sem arquivo, tente outra opção ✨";
+  } catch (error) {
+    status.textContent = `Erro ao selecionar 😕 ${error.message || ""}`;
+  }
+};
+</script>
 </body>
 </html>
