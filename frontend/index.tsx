@@ -4,7 +4,7 @@ import { useState } from "react";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Livros da Rafa — sua biblioteca pessoal" },
+      { title: "Livros da Rafa" },
       { name: "description", content: "Busque e baixe livros de graça. Feito com carinho pra Rafa." },
     ],
   }),
@@ -25,7 +25,7 @@ type SelectedFile = {
   filename: string;
 };
 
-const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? "http://localhost:8000";
+const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? "https://livrosbot.netlify.app/";
 
 function Index() {
   const [query, setQuery] = useState("");
